@@ -692,7 +692,7 @@ export const EnhancedPerformanceTestGenerator = () => {
           csvFiles: selectedCSVFiles,
           reportName: reportName.trim(),
           aiProvider: reportAiProvider,
-          projectId: "00000000-0000-0000-0000-000000000000" // Default project ID
+          projectId: "5210a7a6-1995-45ea-8c24-54c1f4db6cd5" // Use actual project ID from the user's projects
         }
       });
 
@@ -710,6 +710,9 @@ export const EnhancedPerformanceTestGenerator = () => {
         });
         setReportName("");
         setSelectedCSVFiles([]);
+        // Reset file input
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
         loadReports();
       } else {
         const errorMsg = data?.error || 'Unknown error occurred';
