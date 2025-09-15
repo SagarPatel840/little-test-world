@@ -157,7 +157,15 @@ ${file.content}
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Azure OpenAI API error:', errorText);
-        throw new Error(`Azure OpenAI API error: ${response.status}`);
+        const err: any = new Error(`Azure OpenAI API error: ${response.status}`);
+        err.status = response.status;
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed.error?.message) err.message = `Azure OpenAI API error: ${parsed.error.message}`;
+        } catch (_) {
+          // ignore parse error
+        }
+        throw err;
       }
 
       const data = await response.json();
@@ -202,13 +210,15 @@ ${file.content}
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in generate-performance-report function:', error);
+    const status = typeof error?.status === 'number' ? error.status : 500;
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: error?.message || 'Unexpected error',
+      status
     }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
