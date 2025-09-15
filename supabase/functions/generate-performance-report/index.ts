@@ -108,7 +108,20 @@ ${file.content}
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Gemini API error:', errorText);
-        throw new Error(`Gemini API error: ${response.status}`);
+        
+        // Parse error response to provide better error messages
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.code === 429) {
+            throw new Error('Gemini API quota exceeded. Please check your billing details or try again later.');
+          } else if (errorData.error?.message) {
+            throw new Error(`Gemini API error: ${errorData.error.message}`);
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, use the original error
+        }
+        
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
