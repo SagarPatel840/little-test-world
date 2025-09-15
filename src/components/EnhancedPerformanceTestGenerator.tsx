@@ -696,9 +696,14 @@ export const EnhancedPerformanceTestGenerator = () => {
         }
       });
 
-      if (error) throw error;
+      console.log('Response from edge function:', { data, error });
 
-      if (data.success) {
+      if (error) {
+        console.error('Supabase functions error:', error);
+        throw new Error(`Function call failed: ${error.message}`);
+      }
+
+      if (data?.success) {
         toast({
           title: "Report generated successfully",
           description: `Report "${reportName}" has been created`
@@ -707,9 +712,12 @@ export const EnhancedPerformanceTestGenerator = () => {
         setSelectedCSVFiles([]);
         loadReports();
       } else {
-        throw new Error(data.error);
+        const errorMsg = data?.error || 'Unknown error occurred';
+        console.error('Report generation failed:', data);
+        throw new Error(errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error generating report:', error);
       toast({
         title: "Error generating report",
         description: error.message || "Failed to generate report",
