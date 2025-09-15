@@ -8,47 +8,52 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
 
-    --primary: 266 83% 58%;
-    --primary-foreground: 0 0% 98%;
-    --primary-glow: 266 83% 78%;
+    --primary: 245 58% 51%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 245 70% 65%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 215 20% 95%;
+    --secondary-foreground: 215 25% 15%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 15% 45%;
 
-    --accent: 12 76% 61%;
-    --accent-foreground: 0 0% 98%;
-    --accent-glow: 12 76% 81%;
+    --accent: 270 95% 75%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 266 83% 58%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 15% 88%;
+    --input: 215 15% 88%;
+    --ring: 245 58% 51%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow)));
-    --gradient-card: linear-gradient(145deg, hsl(240 5% 6%), hsl(240 3% 9%));
+    --gradient-primary: linear-gradient(135deg, hsl(245 58% 51%), hsl(270 95% 75%));
+    --gradient-secondary: linear-gradient(135deg, hsl(215 20% 95%), hsl(0 0% 100%));
+    --gradient-hero: linear-gradient(135deg, hsl(245 58% 51% / 0.1), hsl(270 95% 75% / 0.1));
     
     /* Shadows */
-    --shadow-primary: 0 20px 40px -12px hsl(var(--primary) / 0.5);
-    --shadow-accent: 0 20px 40px -12px hsl(var(--accent) / 0.5);
-    --shadow-elegant: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    --shadow-elegant: 0 10px 30px -10px hsl(245 58% 51% / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(215 25% 15% / 0.1);
+    --shadow-glow: 0 0 40px hsl(245 70% 65% / 0.4);
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
 
