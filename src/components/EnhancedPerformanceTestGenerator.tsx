@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, Download, Zap, FileText, Settings, BarChart3, CheckCircle, AlertTriangle, TestTube, Brain } from "lucide-react";
+import { Upload, Download, Zap, FileText, Settings, BarChart3, CheckCircle, AlertTriangle, TestTube, Brain, Eye, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import * as yaml from "js-yaml";
@@ -50,6 +50,25 @@ interface ProcessingResult {
   };
 }
 
+interface PerformanceReport {
+  id: string;
+  report_name: string;
+  created_at: string;
+  ai_provider: string;
+  report_content: string;
+  csv_files_metadata: Array<{
+    name: string;
+    size: number;
+    uploaded_at: string;
+  }>;
+}
+
+interface CSVFile {
+  name: string;
+  content: string;
+  size: number;
+}
+
 export const EnhancedPerformanceTestGenerator = () => {
   // Common state
   const [activeTab, setActiveTab] = useState("swagger");
@@ -84,6 +103,15 @@ export const EnhancedPerformanceTestGenerator = () => {
   const [isHarProcessing, setIsHarProcessing] = useState(false);
   const [harProgress, setHarProgress] = useState(0);
   const [harResult, setHarResult] = useState<ProcessingResult | null>(null);
+
+  // Generated Reports state
+  const [reports, setReports] = useState<PerformanceReport[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+  const [selectedCSVFiles, setSelectedCSVFiles] = useState<CSVFile[]>([]);
+  const [reportName, setReportName] = useState("");
+  const [reportAiProvider, setReportAiProvider] = useState<'gemini' | 'azure-openai'>('gemini');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<PerformanceReport | null>(null);
 
   // Swagger to JMX Functions
   const handleSwaggerFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -577,6 +605,231 @@ export const EnhancedPerformanceTestGenerator = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Generated Reports Functions
+  const loadReports = async () => {
+    setIsLoadingReports(true);
+    try {
+      const { data, error } = await supabase
+        .from('performance_reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setReports((data || []).map(report => ({
+        ...report,
+        csv_files_metadata: Array.isArray(report.csv_files_metadata) 
+          ? report.csv_files_metadata as Array<{name: string; size: number; uploaded_at: string}>
+          : []
+      })));
+    } catch (error) {
+      toast({
+        title: "Error loading reports",
+        description: "Failed to load performance reports",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const csvFiles: CSVFile[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        try {
+          const content = await file.text();
+          csvFiles.push({
+            name: file.name,
+            content,
+            size: file.size
+          });
+        } catch (error) {
+          toast({
+            title: "Error reading file",
+            description: `Failed to read ${file.name}`,
+            variant: "destructive"
+          });
+        }
+      }
+    }
+
+    setSelectedCSVFiles(csvFiles);
+    toast({
+      title: "CSV files uploaded",
+      description: `Successfully loaded ${csvFiles.length} CSV files`
+    });
+  };
+
+  const generateReport = async () => {
+    if (!reportName.trim()) {
+      toast({
+        title: "Missing report name",
+        description: "Please enter a report name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (selectedCSVFiles.length === 0) {
+      toast({
+        title: "No CSV files",
+        description: "Please upload CSV files first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingReport(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-performance-report', {
+        body: {
+          csvFiles: selectedCSVFiles,
+          reportName: reportName.trim(),
+          aiProvider: reportAiProvider,
+          projectId: "00000000-0000-0000-0000-000000000000" // Default project ID
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "Report generated successfully",
+          description: `Report "${reportName}" has been created`
+        });
+        setReportName("");
+        setSelectedCSVFiles([]);
+        loadReports();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      toast({
+        title: "Error generating report",
+        description: error.message || "Failed to generate report",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const deleteReport = async (reportId: string) => {
+    try {
+      const { error } = await supabase
+        .from('performance_reports')
+        .delete()
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Report deleted",
+        description: "Performance report has been deleted"
+      });
+      loadReports();
+    } catch (error) {
+      toast({
+        title: "Error deleting report",
+        description: "Failed to delete report",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportReport = (report: PerformanceReport, format: 'html' | 'pdf' | 'docx') => {
+    let content = '';
+    let mimeType = '';
+    let fileName = '';
+
+    switch (format) {
+      case 'html':
+        content = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${report.report_name}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+              h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              h2 { color: #666; margin-top: 30px; }
+              .metadata { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="metadata">
+              <strong>Report:</strong> ${report.report_name}<br>
+              <strong>Generated:</strong> ${new Date(report.created_at).toLocaleString()}<br>
+              <strong>AI Provider:</strong> ${report.ai_provider}
+            </div>
+            <div>${report.report_content.replace(/\n/g, '<br>')}</div>
+          </body>
+          </html>
+        `;
+        mimeType = 'text/html';
+        fileName = `${report.report_name}.html`;
+        break;
+      
+      case 'pdf':
+        // For now, we'll export as HTML since direct PDF generation requires additional libraries
+        content = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${report.report_name}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+              h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              h2 { color: #666; margin-top: 30px; }
+              .metadata { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="metadata">
+              <strong>Report:</strong> ${report.report_name}<br>
+              <strong>Generated:</strong> ${new Date(report.created_at).toLocaleString()}<br>
+              <strong>AI Provider:</strong> ${report.ai_provider}
+            </div>
+            <div>${report.report_content.replace(/\n/g, '<br>')}</div>
+          </body>
+          </html>
+        `;
+        mimeType = 'text/html';
+        fileName = `${report.report_name}_PDF.html`;
+        break;
+
+      case 'docx':
+        // Export as plain text for now - DOCX generation requires additional libraries
+        content = `${report.report_name}\n\nGenerated: ${new Date(report.created_at).toLocaleString()}\nAI Provider: ${report.ai_provider}\n\n${report.report_content}`;
+        mimeType = 'text/plain';
+        fileName = `${report.report_name}.txt`;
+        break;
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Load reports when the tab changes to "reports"
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      loadReports();
+    }
+  }, [activeTab]);
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-2">
@@ -682,9 +935,10 @@ export const EnhancedPerformanceTestGenerator = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="swagger">Swagger to JMX</TabsTrigger>
           <TabsTrigger value="har">HAR to JMX</TabsTrigger>
+          <TabsTrigger value="reports">Generated Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="swagger" className="space-y-6">
@@ -1113,6 +1367,186 @@ export const EnhancedPerformanceTestGenerator = () => {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* CSV Upload Panel */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Upload CSV Files</CardTitle>
+                <CardDescription>Upload multiple performance test CSV files for analysis</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="csvFiles">Select CSV Files</Label>
+                  <Input
+                    id="csvFiles"
+                    type="file"
+                    accept=".csv"
+                    multiple
+                    onChange={handleCSVUpload}
+                    className="cursor-pointer"
+                  />
+                </div>
+
+                {selectedCSVFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Selected Files ({selectedCSVFiles.length})</Label>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {selectedCSVFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                          <span className="text-sm truncate">{file.name}</span>
+                          <Badge variant="secondary">{(file.size / 1024).toFixed(1)} KB</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="reportName">Report Name</Label>
+                  <Input
+                    id="reportName"
+                    value={reportName}
+                    onChange={(e) => setReportName(e.target.value)}
+                    placeholder="Enter report name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="reportAiProvider">AI Provider</Label>
+                  <Select value={reportAiProvider} onValueChange={(value: 'gemini' | 'azure-openai') => setReportAiProvider(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini">Gemini</SelectItem>
+                      <SelectItem value="azure-openai">Azure OpenAI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  onClick={generateReport}
+                  disabled={isGeneratingReport || selectedCSVFiles.length === 0 || !reportName.trim()}
+                  className="w-full"
+                >
+                  {isGeneratingReport ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating Report...
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="mr-2 h-4 w-4" />
+                      Generate Performance Report
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Reports List Panel */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Generated Reports</CardTitle>
+                <CardDescription>View and manage your performance analysis reports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingReports ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : reports.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No reports generated yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {reports.map((report) => (
+                      <div key={report.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold truncate">{report.report_name}</h3>
+                          <Badge variant="outline">
+                            {report.ai_provider === 'gemini' ? 'Gemini' : 'Azure OpenAI'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Generated on {new Date(report.created_at).toLocaleDateString()} at{' '}
+                          {new Date(report.created_at).toLocaleTimeString()}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedReport(report)}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => exportReport(report, 'html')}
+                          >
+                            <FileDown className="h-3 w-3 mr-1" />
+                            HTML
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => exportReport(report, 'pdf')}
+                          >
+                            <FileDown className="h-3 w-3 mr-1" />
+                            PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => exportReport(report, 'docx')}
+                          >
+                            <FileDown className="h-3 w-3 mr-1" />
+                            DOCX
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteReport(report.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Report Viewer Modal */}
+          {selectedReport && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{selectedReport.report_name}</CardTitle>
+                  <Button variant="outline" onClick={() => setSelectedReport(null)}>
+                    Close
+                  </Button>
+                </div>
+                <CardDescription>
+                  Generated on {new Date(selectedReport.created_at).toLocaleString()} using {selectedReport.ai_provider}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-96 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm">{selectedReport.report_content}</pre>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
