@@ -56,21 +56,68 @@ Your tasks:
 1. Analyze all the CSV files collectively.
 2. Identify key performance metrics such as response time, throughput, error rate, latency, resource utilization, and trends across runs.
 3. Highlight bottlenecks, anomalies, or significant variations between test runs.
-4. Consolidate findings into a single final performance report that:
-   - Summarizes overall system performance.
-   - Compares and contrasts metrics across runs.
-   - Highlights improvements, regressions, and stability issues.
-   - Provides root cause insights where possible.
-   - Gives actionable recommendations for developers and stakeholders.
+4. Consolidate findings into a single final performance report.
 
-Format the output report in a **professional, structured manner** with the following sections:
-- **Executive Summary**
-- **Key Observations & Trends**
-- **Bottlenecks & Issues Identified**
-- **Comparison Across Runs**
-- **Recommendations & Next Steps**
+**CRITICAL FORMATTING REQUIREMENTS:**
+- Use clear markdown headings: # for main sections, ## for subsections, ### for sub-points
+- Present performance metrics in properly formatted markdown tables with comparisons across runs
+- Use bullet points (- or *) for trends, bottlenecks, and recommendations
+- Use ✅ symbol to highlight improvements and positive trends
+- Use ❌ symbol to highlight regressions and issues
+- Use 📊 symbol for metrics and data points
+- Use 🔍 symbol for observations and insights
+- Use ⚠️ symbol for warnings and critical issues
+- Keep tone professional for both technical teams and senior management
+- Include specific numbers, percentages, and quantitative data where possible
 
-Write the report as if you are delivering it to senior management and technical teams. Keep it detailed, insightful, and practical.
+Structure the report with these exact sections:
+
+# Performance Test Analysis Report
+
+## Executive Summary
+[Brief overview with key findings and overall assessment]
+
+## Performance Metrics Overview
+[Create a comparison table showing key metrics across all test runs]
+
+## Key Observations & Trends
+### Response Time Analysis
+- [Bullet points with specific trends]
+### Throughput Analysis  
+- [Bullet points with specific trends]
+### Error Rate Analysis
+- [Bullet points with specific trends]
+
+## Issues Identified
+### Critical Issues ❌
+- [Bullet points for critical problems]
+### Performance Bottlenecks ⚠️
+- [Bullet points for bottlenecks]
+
+## Comparison Across Test Runs
+[Detailed comparison table with analysis]
+
+## Improvements & Regressions
+### Improvements ✅
+- [Bullet points for positive changes]
+### Regressions ❌
+- [Bullet points for negative changes]
+
+## Root Cause Analysis
+🔍 [Detailed analysis of underlying causes]
+
+## Recommendations & Next Steps
+### Immediate Actions (High Priority)
+- [Bullet points for urgent recommendations]
+### Medium-term Improvements
+- [Bullet points for planned improvements]
+### Long-term Strategy
+- [Bullet points for strategic recommendations]
+
+## Conclusion
+[Final assessment and summary]
+
+Write as if delivering to both senior management and technical teams. Include specific quantitative data, percentages, and actionable insights.
 
 Here are the CSV file contents:
 
