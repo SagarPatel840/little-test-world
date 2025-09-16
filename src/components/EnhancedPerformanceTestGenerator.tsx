@@ -112,6 +112,22 @@ export const EnhancedPerformanceTestGenerator = () => {
   const [reportAiProvider, setReportAiProvider] = useState<'gemini' | 'azure-openai'>('gemini');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [selectedReport, setSelectedReport] = useState<PerformanceReport | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+
+  // Load a project id for the current user (fallback to most recently created)
+  useEffect(() => {
+    const loadProject = async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (!error && data && data.length > 0) {
+        setCurrentProjectId(data[0].id);
+      }
+    };
+    loadProject();
+  }, []);
 
   // Swagger to JMX Functions
   const handleSwaggerFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -687,12 +703,21 @@ export const EnhancedPerformanceTestGenerator = () => {
     setIsGeneratingReport(true);
 
     try {
+      if (!currentProjectId) {
+        toast({
+          title: "No project found",
+          description: "Create a project first, then generate a report",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-performance-report', {
         body: {
           csvFiles: selectedCSVFiles,
           reportName: reportName.trim(),
           aiProvider: reportAiProvider,
-          projectId: "5210a7a6-1995-45ea-8c24-54c1f4db6cd5" // Use actual project ID from the user's projects
+          projectId: currentProjectId
         }
       });
 
@@ -700,7 +725,11 @@ export const EnhancedPerformanceTestGenerator = () => {
 
       if (error) {
         console.error('Supabase functions error:', error);
-        throw new Error(`Function call failed: ${error.message}`);
+        throw new Error(
+          reportAiProvider === 'gemini'
+            ? 'Gemini is currently rate-limited or quota-exhausted. Please wait ~1 minute or switch to Azure OpenAI.'
+            : `Function call failed: ${error.message}`
+        );
       }
 
       if (data?.success) {
