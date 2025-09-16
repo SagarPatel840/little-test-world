@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Upload, Download, Zap, FileText, BarChart3, CheckCircle, AlertTriangle, TestTube, Brain, Eye, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,6 +87,7 @@ export const EnhancedPerformanceTestGenerator = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [selectedReport, setSelectedReport] = useState<PerformanceReport | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   // Load a project id for the current user (fallback to most recently created)
   useEffect(() => {
@@ -636,6 +638,7 @@ export const EnhancedPerformanceTestGenerator = () => {
         
         setSelectedCSVFiles([]);
         setReportName("");
+        setIsReportDialogOpen(false); // Close dialog after successful generation
         fetchReports();
       } else {
         throw new Error(data?.error || 'Unknown error occurred');
@@ -949,19 +952,31 @@ export const EnhancedPerformanceTestGenerator = () => {
         </TabsContent>
 
         <TabsContent value="generate-report" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Performance Reports</h2>
+              <p className="text-muted-foreground">View and manage your generated performance analysis reports</p>
+            </div>
+            
+            <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Generate Report
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] bg-background border z-50">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
                     <Brain className="h-5 w-5" />
-                    Generate New Report
-                  </CardTitle>
-                  <CardDescription>
+                    Generate New Performance Report
+                  </DialogTitle>
+                  <DialogDescription>
                     Upload CSV files and generate an AI-powered performance analysis report
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                   <div>
                     <Label htmlFor="report-name">Report Name</Label>
                     <Input
@@ -1016,7 +1031,7 @@ export const EnhancedPerformanceTestGenerator = () => {
                       <SelectTrigger className="mt-2">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-background border z-50">
                         <SelectItem value="gemini">Google Gemini</SelectItem>
                         <SelectItem value="azure-openai">Azure OpenAI</SelectItem>
                       </SelectContent>
@@ -1040,111 +1055,111 @@ export const EnhancedPerformanceTestGenerator = () => {
                       </>
                     )}
                   </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Generated Reports
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingReports ? (
-                    <div className="space-y-2">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="h-16 bg-muted animate-pulse rounded" />
-                      ))}
-                    </div>
-                  ) : reports.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">
-                      No reports generated yet
-                    </p>
-                  ) : (
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {reports.map((report) => (
-                        <div
-                          key={report.id}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            selectedReport?.id === report.id 
-                              ? 'border-primary bg-primary/5' 
-                              : 'hover:border-muted-foreground'
-                          }`}
-                          onClick={() => setSelectedReport(report)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-sm truncate">
-                                {report.report_name}
-                              </h4>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(report.created_at).toLocaleDateString()}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {report.ai_provider}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {report.csv_files_metadata?.length || 0} files
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  downloadReportAsHTML(report);
-                                }}
-                              >
-                                <FileDown className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteReport(report.id);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
-          {selectedReport && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  {selectedReport.report_name}
+                  <FileText className="h-5 w-5" />
+                  Generated Reports
                 </CardTitle>
-                <CardDescription>
-                  Generated on {new Date(selectedReport.created_at).toLocaleString()} using {selectedReport.ai_provider}
-                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
-                  <div 
-                    className="whitespace-pre-wrap text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: selectedReport.report_content }}
-                  />
-                </div>
+                {isLoadingReports ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+                    ))}
+                  </div>
+                ) : reports.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No reports generated yet. Click "Generate Report" to create your first analysis.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    {reports.map((report) => (
+                      <div
+                        key={report.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedReport?.id === report.id 
+                            ? 'border-primary bg-primary/5' 
+                            : 'hover:border-muted-foreground'
+                        }`}
+                        onClick={() => setSelectedReport(report)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm truncate">
+                              {report.report_name}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(report.created_at).toLocaleDateString()}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {report.ai_provider}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {report.csv_files_metadata?.length || 0} files
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadReportAsHTML(report);
+                              }}
+                            >
+                              <FileDown className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteReport(report.id);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
+
+            {selectedReport && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Report Preview
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedReport.report_name} - Generated on {new Date(selectedReport.created_at).toLocaleDateString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose max-w-none">
+                    <div 
+                      className="whitespace-pre-wrap text-sm leading-relaxed max-h-[400px] overflow-y-auto p-3 bg-muted/30 rounded"
+                      dangerouslySetInnerHTML={{ __html: selectedReport.report_content }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
