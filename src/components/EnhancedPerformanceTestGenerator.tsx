@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, Download, Zap, FileText, BarChart3, CheckCircle, AlertTriangle, TestTube, Brain, Eye, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -470,7 +472,7 @@ export const EnhancedPerformanceTestGenerator = () => {
       }, 200);
 
       const { data, error } = await supabase.functions.invoke('har-to-jmeter', {
-        body: { harContent }
+        body: { harContent, aiProvider }
       });
 
       clearInterval(progressInterval);
@@ -684,6 +686,14 @@ export const EnhancedPerformanceTestGenerator = () => {
   };
 
   const downloadReportAsHTML = (report: PerformanceReport) => {
+    const date = new Date(report.created_at).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -692,22 +702,65 @@ export const EnhancedPerformanceTestGenerator = () => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${report.report_name}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-        .meta { color: #666; font-size: 14px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            margin: 0; 
+            padding: 40px;
+            color: #333;
+            background: #fafafa;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 60px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #2563eb;
+        }
+        .header h1 {
+            color: #1e40af;
+            font-size: 2.5em;
+            margin: 0;
+            font-weight: 700;
+        }
+        .generated-date {
+            color: #6b7280;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+        h1 { color: #1e40af; font-size: 2.2em; margin-top: 40px; margin-bottom: 20px; font-weight: 700; }
+        h2 { color: #2563eb; font-size: 1.8em; margin-top: 35px; margin-bottom: 15px; font-weight: 600; border-left: 4px solid #2563eb; padding-left: 15px; }
+        h3 { color: #3b82f6; font-size: 1.4em; margin-top: 25px; margin-bottom: 12px; font-weight: 600; }
         .content { white-space: pre-wrap; }
+        .footer {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>${report.report_name}</h1>
-        <div class="meta">
-            Generated on: ${new Date(report.created_at).toLocaleString()}<br>
-            AI Provider: ${report.ai_provider}<br>
-            Files analyzed: ${report.csv_files_metadata?.length || 0}
+    <div class="container">
+        <div class="header">
+            <h1>${report.report_name}</h1>
+            <div class="generated-date">Generated on: ${date}</div>
+        </div>
+        <div class="content">${report.report_content.replace(/\n/g, '<br>')}</div>
+        <div class="footer">
+            <p><strong>Performance Testing Report</strong> | Confidential Document</p>
+            <p>AI Provider: ${report.ai_provider} | Files analyzed: ${report.csv_files_metadata?.length || 0}</p>
         </div>
     </div>
-    <div class="content">${report.report_content}</div>
 </body>
 </html>`;
 
@@ -715,11 +768,102 @@ export const EnhancedPerformanceTestGenerator = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${report.report_name}.html`;
+    a.download = `${report.report_name.replace(/\s+/g, '_')}_Report.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadReportAsWord = (report: PerformanceReport) => {
+    const date = new Date(report.created_at).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    let rtfContent = report.report_content
+      .replace(/^# (.*$)/gim, '\\par\\b\\fs32 $1\\b0\\fs24\\par')
+      .replace(/^## (.*$)/gim, '\\par\\b\\fs28 $1\\b0\\fs24\\par')
+      .replace(/^### (.*$)/gim, '\\par\\b\\fs26 $1\\b0\\fs24\\par')
+      .replace(/\*\*(.*?)\*\*/g, '\\b $1\\b0')
+      .replace(/\*(.*?)\*/g, '\\i $1\\i0')
+      .replace(/^\- (.*$)/gim, '\\par\\bullet $1')
+      .replace(/\n/g, '\\par');
+
+    const wordContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}
+\\f0\\fs24
+\\par\\qc\\b\\fs36 ${report.report_name}\\b0\\fs24
+\\par\\qc Generated on: ${date}
+\\par\\qc AI Provider: ${report.ai_provider} | Files: ${report.csv_files_metadata?.length || 0}
+\\par\\par
+${rtfContent}
+\\par\\par
+\\qc\\i Generated by Advanced Performance Testing Suite\\i0
+}`;
+
+    const blob = new Blob([wordContent], { type: 'application/rtf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report.report_name.replace(/\s+/g, '_')}_Report.rtf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadReportAsPDF = (report: PerformanceReport) => {
+    const date = new Date(report.created_at).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${report.report_name}</title>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+        .header h1 { color: #1e40af; font-size: 2em; margin: 0; }
+        .generated-date { color: #6b7280; margin-top: 10px; font-size: 0.9em; }
+        .content { white-space: pre-wrap; }
+        .footer { margin-top: 40px; text-align: center; color: #666; font-size: 0.8em; page-break-inside: avoid; }
+        h1 { color: #1e40af; font-size: 1.5em; margin-top: 25px; page-break-after: avoid; }
+        h2 { color: #2563eb; font-size: 1.3em; margin-top: 20px; page-break-after: avoid; }
+        h3 { color: #3b82f6; font-size: 1.1em; margin-top: 15px; page-break-after: avoid; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${report.report_name}</h1>
+        <div class="generated-date">Generated on: ${date}</div>
+        <div class="generated-date">AI Provider: ${report.ai_provider} | Files analyzed: ${report.csv_files_metadata?.length || 0}</div>
+    </div>
+    <div class="content">${report.report_content.replace(/\n/g, '<br>')}</div>
+    <div class="footer">
+        <p><strong>Performance Testing Report</strong> | Confidential Document | Generated by Advanced Performance Testing Suite</p>
+    </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    }
   };
 
   return (
@@ -799,58 +943,74 @@ export const EnhancedPerformanceTestGenerator = () => {
                         />
                       </div>
 
-                      <div>
-                        <Label>Group Requests By</Label>
-                        <Select 
-                          value={swaggerConfig.groupBy} 
-                          onValueChange={(value: 'tag' | 'path') => setSwaggerConfig(prev => ({ ...prev, groupBy: value }))}
-                        >
-                          <SelectTrigger className="mt-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="tag">Tags</SelectItem>
-                            <SelectItem value="path">Path Segments</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                       <div>
+                         <Label>Group Requests By</Label>
+                         <Select 
+                           value={swaggerConfig.groupBy} 
+                           onValueChange={(value: 'tag' | 'path') => setSwaggerConfig(prev => ({ ...prev, groupBy: value }))}
+                         >
+                           <SelectTrigger className="mt-2">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="tag">Tags</SelectItem>
+                             <SelectItem value="path">Path Segments</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+
+                       <div>
+                         <Label>AI Provider</Label>
+                         <Select 
+                           value={aiProvider} 
+                           onValueChange={(value: 'google' | 'openai') => setAiProvider(value)}
+                         >
+                           <SelectTrigger className="mt-2">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="google">Google AI (Gemini)</SelectItem>
+                             <SelectItem value="openai">OpenAI (GPT)</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+
+                       <Button 
+                         onClick={processSwagger}
+                         disabled={isSwaggerProcessing || !swaggerContent.trim() || !swaggerConfig.baseUrl.trim()}
+                         className="w-full"
+                       >
+                         {isSwaggerProcessing ? (
+                           <>
+                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                             Processing...
+                           </>
+                         ) : (
+                           <>
+                             <Zap className="h-4 w-4 mr-2" />
+                             Generate JMX
+                           </>
+                         )}
+                       </Button>
                     </div>
 
-                    <div className="space-y-4">
-                      <Button 
-                        onClick={processSwagger}
-                        disabled={isSwaggerProcessing || !swaggerContent.trim() || !swaggerConfig.baseUrl.trim()}
-                        className="w-full"
-                      >
-                        {isSwaggerProcessing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="h-4 w-4 mr-2" />
-                            Generate JMeter XML
-                          </>
-                        )}
-                      </Button>
-
-                      {swaggerJmeterXml && (
-                        <div className="space-y-3">
-                          <Alert>
-                            <CheckCircle className="h-4 w-4" />
-                            <AlertDescription>
-                              JMeter test plan generated successfully! You can now download the JMX file.
-                            </AlertDescription>
-                          </Alert>
-                          
-                          <Button onClick={downloadSwaggerJMX} variant="outline" className="w-full">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download JMX File
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                     <div className="space-y-4">
+                       {swaggerJmeterXml && (
+                         <div className="space-y-3">
+                           <Alert>
+                             <CheckCircle className="h-4 w-4" />
+                             <AlertDescription>
+                               JMeter test plan generated successfully! You can now download the JMX file.
+                             </AlertDescription>
+                           </Alert>
+                           
+                           <Button onClick={downloadSwaggerJMX} variant="outline" className="w-full">
+                             <Download className="h-4 w-4 mr-2" />
+                             Download JMX File
+                           </Button>
+                         </div>
+                       )}
+                     </div>
                   </div>
                 </TabsContent>
 
@@ -868,82 +1028,98 @@ export const EnhancedPerformanceTestGenerator = () => {
                         />
                       </div>
 
-                      {harFile && (
-                        <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-sm font-medium">Selected file:</p>
-                          <p className="text-sm text-muted-foreground">{harFile.name}</p>
-                        </div>
-                      )}
+                       {harFile && (
+                         <div className="p-3 bg-muted rounded-lg">
+                           <p className="text-sm font-medium">Selected file:</p>
+                           <p className="text-sm text-muted-foreground">{harFile.name}</p>
+                         </div>
+                       )}
+
+                       <div>
+                         <Label>AI Provider</Label>
+                         <Select 
+                           value={aiProvider} 
+                           onValueChange={(value: 'google' | 'openai') => setAiProvider(value)}
+                         >
+                           <SelectTrigger className="mt-2">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="google">Google AI (Gemini)</SelectItem>
+                             <SelectItem value="openai">OpenAI (GPT)</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+
+                       <Button 
+                         onClick={processHar}
+                         disabled={isHarProcessing || !harContent}
+                         className="w-full"
+                       >
+                         {isHarProcessing ? (
+                           <>
+                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                             Processing HAR...
+                           </>
+                         ) : (
+                           <>
+                             <Zap className="h-4 w-4 mr-2" />
+                             Generate JMX
+                           </>
+                         )}
+                       </Button>
                     </div>
 
-                    <div className="space-y-4">
-                      <Button 
-                        onClick={processHar}
-                        disabled={isHarProcessing || !harContent}
-                        className="w-full"
-                      >
-                        {isHarProcessing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Processing HAR...
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="h-4 w-4 mr-2" />
-                            Convert to JMeter
-                          </>
-                        )}
-                      </Button>
+                     <div className="space-y-4">
+                       {isHarProcessing && harProgress > 0 && (
+                         <div className="space-y-2">
+                           <Progress value={harProgress} className="w-full" />
+                           <p className="text-sm text-center text-muted-foreground">
+                             Processing... {harProgress}%
+                           </p>
+                         </div>
+                       )}
 
-                      {isHarProcessing && harProgress > 0 && (
-                        <div className="space-y-2">
-                          <Progress value={harProgress} className="w-full" />
-                          <p className="text-sm text-center text-muted-foreground">
-                            Processing... {harProgress}%
-                          </p>
-                        </div>
-                      )}
+                       {harResult && (
+                         <div className="space-y-3">
+                           <Alert>
+                             <CheckCircle className="h-4 w-4" />
+                             <AlertDescription>
+                               HAR file converted successfully! JMeter test plan is ready for download.
+                             </AlertDescription>
+                           </Alert>
+                           
+                           <Button onClick={downloadHarJMX} variant="outline" className="w-full">
+                             <Download className="h-4 w-4 mr-2" />
+                             Download JMX File
+                           </Button>
 
-                      {harResult && (
-                        <div className="space-y-3">
-                          <Alert>
-                            <CheckCircle className="h-4 w-4" />
-                            <AlertDescription>
-                              HAR file converted successfully! JMeter test plan is ready for download.
-                            </AlertDescription>
-                          </Alert>
-                          
-                          <Button onClick={downloadHarJMX} variant="outline" className="w-full">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download JMX File
-                          </Button>
-
-                          <div className="p-4 bg-muted rounded-lg space-y-2">
-                            <h4 className="font-medium">Analysis Summary</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Total Requests:</span>
-                                <span className="ml-2 font-medium">{harResult.summary.totalRequests}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Unique Domains:</span>
-                                <span className="ml-2 font-medium">{harResult.summary.uniqueDomains.length}</span>
-                              </div>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Methods Used:</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {harResult.summary.methodsUsed.map(method => (
-                                  <Badge key={method} variant="secondary" className="text-xs">
-                                    {method}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                           <div className="p-4 bg-muted rounded-lg space-y-2">
+                             <h4 className="font-medium">Analysis Summary</h4>
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                               <div>
+                                 <span className="text-muted-foreground">Total Requests:</span>
+                                 <span className="ml-2 font-medium">{harResult.summary.totalRequests}</span>
+                               </div>
+                               <div>
+                                 <span className="text-muted-foreground">Unique Domains:</span>
+                                 <span className="ml-2 font-medium">{harResult.summary.uniqueDomains.length}</span>
+                               </div>
+                             </div>
+                             <div>
+                               <span className="text-muted-foreground">Methods Used:</span>
+                               <div className="flex flex-wrap gap-1 mt-1">
+                                 {harResult.summary.methodsUsed.map(method => (
+                                   <Badge key={method} variant="secondary" className="text-xs">
+                                     {method}
+                                   </Badge>
+                                 ))}
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       )}
+                     </div>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -1060,7 +1236,7 @@ export const EnhancedPerformanceTestGenerator = () => {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6 w-full">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1080,85 +1256,157 @@ export const EnhancedPerformanceTestGenerator = () => {
                     No reports generated yet. Click "Generate Report" to create your first analysis.
                   </p>
                 ) : (
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {reports.map((report) => (
-                      <div
-                        key={report.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedReport?.id === report.id 
-                            ? 'border-primary bg-primary/5' 
-                            : 'hover:border-muted-foreground'
-                        }`}
-                        onClick={() => setSelectedReport(report)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-sm truncate">
-                              {report.report_name}
-                            </h4>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(report.created_at).toLocaleDateString()}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {report.ai_provider}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {report.csv_files_metadata?.length || 0} files
-                              </span>
+                  <ScrollArea className="h-[400px] w-full">
+                    <div className="space-y-3 pr-4">
+                      {reports.map((report) => (
+                        <div
+                          key={report.id}
+                          className={`group relative p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
+                            selectedReport?.id === report.id 
+                              ? 'border-primary bg-primary/5 shadow-sm' 
+                              : 'hover:border-muted-foreground/60 hover:bg-muted/30'
+                          }`}
+                          onClick={() => setSelectedReport(report)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                                <h4 className="font-semibold text-sm truncate max-w-[200px]">
+                                  {report.report_name}
+                                </h4>
+                                {selectedReport?.id === report.id && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Selected
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <span>📅</span>
+                                  {new Date(report.created_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                                <div className="flex items-center gap-3">
+                                  <Badge 
+                                    variant={report.ai_provider === 'gemini' ? 'default' : 'secondary'} 
+                                    className="text-xs"
+                                  >
+                                    <Brain className="w-2 h-2 mr-1" />
+                                    {report.ai_provider === 'gemini' ? 'Gemini' : 'Azure OpenAI'}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <FileText className="w-3 h-3" />
+                                    {report.csv_files_metadata?.length || 0} files
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <FileDown className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadReportAsHTML(report);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    HTML
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadReportAsWord(report);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    Word
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadReportAsPDF(report);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    PDF
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteReport(report.id);
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                downloadReportAsHTML(report);
-                              }}
-                            >
-                              <FileDown className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteReport(report.id);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 )}
               </CardContent>
             </Card>
 
-            {selectedReport && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Eye className="h-5 w-5" />
-                    Report Preview
-                  </CardTitle>
-                  <CardDescription>
-                    {selectedReport.report_name} - Generated on {new Date(selectedReport.created_at).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none">
-                    <div 
-                      className="whitespace-pre-wrap text-sm leading-relaxed max-h-[400px] overflow-y-auto p-3 bg-muted/30 rounded"
-                      dangerouslySetInnerHTML={{ __html: selectedReport.report_content }}
-                    />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5" />
+                  Report Preview
+                </CardTitle>
+                <CardDescription>
+                  {selectedReport 
+                    ? `${selectedReport.report_name} - Generated on ${new Date(selectedReport.created_at).toLocaleDateString()}` 
+                    : "Select a report from the list above to view its content"
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {selectedReport ? (
+                  <ScrollArea className="h-[600px] w-full">
+                    <div className="prose max-w-none pr-4">
+                      <div 
+                        className="whitespace-pre-wrap text-sm leading-relaxed p-4 bg-muted/30 rounded border"
+                        dangerouslySetInnerHTML={{ __html: selectedReport.report_content }}
+                      />
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground border rounded bg-muted/20">
+                    <div className="text-center space-y-2">
+                      <FileText className="h-16 w-16 mx-auto opacity-30" />
+                      <p className="text-lg">Select a report to view preview</p>
+                      <p className="text-sm">The report content will appear here</p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
